@@ -267,8 +267,35 @@
     stopBtn.onclick = stop;
     resetBtn.onclick = reset;
   </script>
+
+  <a href="#" onclick="openMinimalWindow('https://nonoduck.github.io/timmer/'); return false;">
+  點擊開啟極簡計時器
+</a>
+
+<script>
+function openMinimalWindow(url) {
+  // 設定新視窗的特徵
+  const windowFeatures = 'width=350,height=400,scrollbars=no,resizable=no,location=no,menubar=no,toolbar=no,status=no';
+
+  // 1. **width/height**: 設定視窗大小。
+  // 2. **scrollbars=no**: 移除捲軸。
+  // 3. **resizable=no**: 避免使用者調整大小。
+  // 4. **location=no**: 嘗試移除地址欄（大多瀏覽器會忽略）。
+  // 5. **menubar=no**: 移除選單欄。
+  // 6. **toolbar=no**: 移除工具列（如「上一頁/下一頁」按鈕）。
+  // 7. **status=no**: 移除狀態欄。
+
+  // 讓新視窗的內容保持在一個獨立的視窗中
+  const windowName = 'MinimalTimerWindow'; 
+  
+  window.open(url, windowName, windowFeatures);
+  
+  return false; // 阻止連結的預設行為
+}
+</script>
 </body>
 
 </html>
+
 
 

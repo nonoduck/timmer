@@ -1,0 +1,23 @@
+// manifest.json
+{
+  "name": "極簡計時器",
+  "short_name": "計時器",
+  "description": "極簡風格的正計時與倒數計時器",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

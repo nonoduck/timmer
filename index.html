@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="計時器">
+
+  <title>極簡計時器</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- iOS 支援 -->
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <!-- 圖示預載 -->
+  <link rel="icon" href="icon-192.png" sizes="192x192">
+  <link rel="icon" href="icon-512.png" sizes="512x512">
+
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #000;
+      color: #fff;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #time {
+      font-weight: 100;
+      letter-spacing: -0.05em;
+      transition: font-size 0.2s ease;
+      line-height: 1;
+    }
+    #controls, #size-controls {
+      margin-top: 3vh;
+      display: flex;
+      gap: 1.5vw;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    button {
+      background: none;
+      border: 1px solid #fff;
+      color: #fff;
+      padding: 1vh 2.5vw;
+      font-size: 3.5vw;
+      cursor: pointer;
+      border-radius: 0.5vh;
+      transition: 0.2s;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) { background: #fff; color: #000; }
+    button:active { transform: scale(0.95); }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      color: #666;
+      border-color: #666;
+    }
+    #size-slider {
+      -webkit-appearance: none;
+      width: 150px;
+      height: 4px;
+      background: #333;
+      outline: none;
+      border-radius: 2px;
+    }
+    #size-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    #size-value {
+      font-size: 2.8vw;
+      min-width: 50px;
+      text-align: center;
+    }
+    @media (min-width: 600px) {
+      button { font-size: 18px; padding: 8px 20px; }
+      #size-slider { width: 180px; }
+      #size-value { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="time">00:00</div>
+  <div id="controls">
+    <button id="start">開始計時</button>
+    <button id="continue">繼續計時</button>
+    <button id="stop">停止</button>
+    <button id="countdown">開始倒數</button>
+    <button id="reset">重置</button>
+  </div>
+  <div id="size-controls">
+    <button id="size-down">－</button>
+    <input type="range" id="size-slider" min="30" max="600" value="200">
+    <span id="size-value">200</span>
+    <button id="size-up">＋</button>
+  </div>
+
+  <!-- Service Worker 註冊 -->
+  <script>
+    // 註冊 Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('SW registered: ', reg))
+          .catch(err => console.log('SW registration failed: ', err));
+      });
+    }
+  </script>
+
+  <script>
+    // === 原有計時器邏輯（不變）===
+    const timeEl = document.getElementById('time');
+    const startBtn = document.getElementById('start');
+    const continueBtn = document.getElementById('continue');
+    const stopBtn = document.getElementById('stop');
+    const countdownBtn = document.getElementById('countdown');
+    const resetBtn = document.getElementById('reset');
+    const slider = document.getElementById('size-slider');
+    const sizeValue = document.getElementById('size-value');
+    const sizeDown = document.getElementById('size-down');
+    const sizeUp = document.getElementById('size-up');
+
+    let startTime = 0;
+    let elapsed = 0;
+    let targetTime = 0;
+    let timer = null;
+    let isCountdown = false;
+    let fontSize = 200;
+
+    function format(ms) {
+      const totalSec = Math.floor(ms / 1000);
+      const min = String(Math.floor(totalSec / 60)).padStart(2, '0');
+      const sec = String(totalSec % 60).padStart(2, '0');
+      return `${min}:${sec}`;
+    }
+
+    function updateDisplay(ms) {
+      timeEl.textContent = format(ms);
+    }
+
+    function tickForward() {
+      elapsed = Date.now() - startTime;
+      updateDisplay(elapsed);
+    }
+
+    function tickBackward() {
+      const now = Date.now();
+      const remaining = Math.max(0, targetTime - now);
+      updateDisplay(remaining);
+      if (remaining <= 0) {
+        clearInterval(timer);
+        timer = null;
+        isCountdown = false;
+        elapsed = 0;
+        updateDisplay(0);
+        enableAllButtons();
+        countdownBtn.disabled = true;
+        // 可選：震動提示（手機）
+        if ('vibrate' in navigator) navigator.vibrate(200);
+      }
+    }
+
+    function enableAllButtons() {
+      startBtn.disabled = false;
+      continueBtn.disabled = false;
+      stopBtn.disabled = false;
+    }
+
+    function startForward() {
+      if (timer) return;
+      isCountdown = false;
+      startTime = Date.now() - elapsed;
+      timer = setInterval(tickForward, 100);
+      countdownBtn.disabled = false;
+      continueBtn.disabled = true;
+    }
+
+    function continueForward() {
+      if (timer || isCountdown || elapsed === 0) return;
+      startTime = Date.now() - elapsed;
+      timer = setInterval(tickForward, 100);
+    }
+
+    function startCountdown() {
+      if (timer || elapsed === 0) return;
+      isCountdown = true;
+      targetTime = Date.now() + elapsed;
+      timer = setInterval(tickBackward, 100);
+      startBtn.disabled = true;
+      continueBtn.disabled = true;
+    }
+
+    function stop() {
+      if (!timer) return;
+      clearInterval(timer);
+      timer = null;
+      if (isCountdown) {
+        const now = Date.now();
+        elapsed = Math.max(0, targetTime - now);
+        isCountdown = false;
+      }
+      startBtn.disabled = false;
+      continueBtn.disabled = false;
+      countdownBtn.disabled = (elapsed === 0);
+    }
+
+    function reset() {
+      clearInterval(timer);
+      timer = null;
+      elapsed = 0;
+      targetTime = 0;
+      isCountdown = false;
+      updateDisplay(0);
+      startBtn.disabled = false;
+      continueBtn.disabled = true;
+      countdownBtn.disabled = true;
+    }
+
+    function updateFontSize() {
+      fontSize = Math.max(30, Math.min(600, Math.round(fontSize)));
+      timeEl.style.fontSize = `${fontSize}px`;
+      sizeValue.textContent = fontSize;
+      slider.value = fontSize;
+    }
+
+    slider.oninput = () => {
+      fontSize = parseInt(slider.value, 10);
+      updateFontSize();
+    };
+
+    sizeDown.onclick = () => {
+      fontSize = Math.max(30, fontSize - 10);
+      updateFontSize();
+    };
+
+    sizeUp.onclick = () => {
+      fontSize = Math.min(600, fontSize + 10);
+      updateFontSize();
+    };
+
+    // 初始化
+    updateFontSize();
+    updateDisplay(0);
+    continueBtn.disabled = true;
+    countdownBtn.disabled = true;
+
+    // 事件綁定
+    startBtn.onclick = startForward;
+    continueBtn.onclick = continueForward;
+    countdownBtn.onclick = startCountdown;
+    stopBtn.onclick = stop;
+    resetBtn.onclick = reset;
+  </script>
+</body>
+</html>
